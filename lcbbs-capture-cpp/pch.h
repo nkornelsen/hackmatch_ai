@@ -1,5 +1,6 @@
 #pragma once
 
+#include <winrt/base.h>
 #include <winrt/Windows.Graphics.Capture.h>
 #include <windows.graphics.capture.interop.h>
 #include <winrt/windows.graphics.directx.direct3d11.h>

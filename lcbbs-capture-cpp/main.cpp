@@ -1,3 +1,5 @@
+#include <windows.h>
+#include "pch.h"
 #include "main.hpp"
 #include "shared.hpp"
 #include "mem_helpers.hpp"
@@ -13,7 +15,7 @@ using namespace winrt::Windows::Graphics::Capture;
 using namespace winrt::Windows::Graphics::DirectX::Direct3D11;
 using namespace winrt::Windows::Graphics::DirectX;
 using namespace Windows::Graphics::DirectX::Direct3D11;
-
+void send_100ms_keystroke_blocking(uint8_t keystroke, HWND hWnd);
 uint64_t identify_digits(D3D11_MAPPED_SUBRESOURCE &image);
 static BOOL enum_callback(HWND hWnd, LPARAM state) {
     HWND* target_window = (HWND*) state;
@@ -197,7 +199,7 @@ int main(int argc, char* argv[]) {
     std::mutex event_mutex;
     std::condition_variable event_cv;
     bool game_over{false};
-
+    int current_score{0};
     frame_pool.FrameArrived([&](Direct3D11CaptureFramePool f, winrt::Windows::Foundation::IInspectable d) {
         Direct3D11CaptureFrame frame = f.TryGetNextFrame();
         // printf("Frame %d\n", ++i);
@@ -219,25 +221,26 @@ int main(int argc, char* argv[]) {
         winrt::check_hresult(context->Map(pTexture, 0, D3D11_MAP_READ, 0, &texture_mapped));
 
         const int BYTES_PER_PIXEL = 4;
+        int score = (int) identify_digits(texture_mapped);
         for (int y = 0; y < 240; y++) {
             for (int x = 83; x < 83+145; x++) {
                 for (int c = 0; c < 3; c++) {
-                    // printf("%d ", ((uint8_t*) texture_mapped.pData)[(y * texture_mapped.RowPitch) + (x * BYTES_PER_PIXEL) + c]);
+                    // if (i == 3) {
+                    //     printf("%d ", ((uint8_t*) texture_mapped.pData)[(y * texture_mapped.RowPitch) + (x * BYTES_PER_PIXEL) + c]);
+                    // }
                     img_buffer[(y*(145)*3) + (3*(x-83)) + c] = ((uint8_t*) texture_mapped.pData)[(y * texture_mapped.RowPitch) + (x * BYTES_PER_PIXEL) + c];
                 }
             }
         }
-        int score = (int) identify_digits(texture_mapped);
 
         context->Unmap(pTexture, 0);
    
-
         {
             uint8_t go_red = img_buffer[(239 * 145 * 3) + (0 * BYTES_PER_PIXEL) + 2];
             uint8_t go_green = img_buffer[(239 * 145 * 3) + (0 * BYTES_PER_PIXEL) + 1];
             uint8_t go_blue = img_buffer[(239 * 145 * 3) + (0 * BYTES_PER_PIXEL) + 0];
 
-            if (go_red == 59 && go_green == 37 && go_blue == 38) {
+            if (go_red == 59 && go_green == 38 && go_blue == 39) {
                 if (!game_over) {
                     game_over = true;
                     event_cv.notify_one();
@@ -253,7 +256,10 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
-        // printf("score: %d\n", score);
+        if (score != current_score) {
+            current_score = score;
+            printf("score: %d\n", score);
+        }
 
         frame.Close();
         return;
@@ -263,8 +269,9 @@ int main(int argc, char* argv[]) {
     while (true) {
         std::unique_lock lk(event_mutex);
         event_cv.wait(lk, [&]{ return game_over; });
-
-        // reset the game
+        
+        send_100ms_keystroke_blocking(VK_F1, target_window);
+        send_100ms_keystroke_blocking(0x5A, target_window);
 
         game_over = false;
         printf("Game over detected\n");
@@ -290,18 +297,18 @@ uint64_t identify_digits(D3D11_MAPPED_SUBRESOURCE &image) {
     int off_y = 22;
 
     const int offsets[8][2] = {
-        {2, 0},
-        {0, 3},
-        {2, 2},
-        {4, 2},
-        {3, 3},
-        {0, 5},
-        {4, 5},
+        {4, 0},
+        {2, 3},
+        {3, 2},
+        {6, 2},
+        {5, 3},
+        {1, 5},
+        {6, 5},
         {2, 7}
     };
 
     const uint8_t digits[10] = {
-        0xeb, 0x85, 0xb9, 0xf9, 0x12, 0xd3, 0xf3, 0x39, 0xfb, 0xcb
+        0x6b, 0x85, 0xb9, 0xf9, 0x12, 0xd3, 0xf3, 0x99, 0xfb, 0xcb
     };
     uint64_t result = 0;
     uint64_t fac = 100000000;
@@ -310,10 +317,15 @@ uint64_t identify_digits(D3D11_MAPPED_SUBRESOURCE &image) {
         uint8_t digit_mask{0};
         for (int i = 0; i < 8; i++) {
             uint8_t red = ((uint8_t*) image.pData)[(off_y + offsets[i][1])*image.RowPitch + (off_x + offsets[i][0])*4 + 2];
-        
+
+            // ((uint8_t*) image.pData)[(off_y + offsets[i][1])*image.RowPitch + (off_x + offsets[i][0])*4 + 0] = 255;
+            // ((uint8_t*) image.pData)[(off_y + offsets[i][1])*image.RowPitch + (off_x + offsets[i][0])*4 + 1] = 255;
+            // ((uint8_t*) image.pData)[(off_y + offsets[i][1])*image.RowPitch + (off_x + offsets[i][0])*4 + 2] = 0;
+
             if (red > 200) red = 1; else red = 0;
             digit_mask |= (red) << i;
         }
+        // printf("0x%02x\n", digit_mask);
         int digit{0};
         for (int i = 0; i < 10; i++) {
             if (digit_mask == digits[i]) {
@@ -327,4 +339,38 @@ uint64_t identify_digits(D3D11_MAPPED_SUBRESOURCE &image) {
     }
 
     return result;
+}
+
+void send_100ms_keystroke_blocking(uint8_t keystroke, HWND hWnd) {
+
+        uint32_t repeatCount = 0;
+        uint32_t scanCode = 0;
+        uint32_t extended = 0;
+        uint32_t context = 0;
+        uint32_t previousState = 0;
+        uint32_t transition = 0;
+
+        uint32_t lParamDown;
+        uint32_t lParamUp;
+
+        scanCode = MapVirtualKey(keystroke, MAPVK_VK_TO_VSC);
+        lParamDown = repeatCount
+            | (scanCode << 16)
+            | (extended << 24)
+            | (context << 29)
+            | (previousState << 30)
+            | (transition << 31);
+        previousState = 1;
+        transition = 1;
+        lParamUp = repeatCount
+            | (scanCode << 16)
+            | (extended << 24)
+            | (context << 29)
+            | (previousState << 30)
+            | (transition << 31);
+        // reset the game
+        PostMessage(hWnd, WM_KEYDOWN, keystroke, lParamDown);
+        Sleep(50);
+        PostMessage(hWnd, WM_KEYUP, keystroke, lParamUp);
+        Sleep(50);
 }
