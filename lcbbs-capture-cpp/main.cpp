@@ -1,3 +1,4 @@
+#include "server.hpp"
 #include <windows.h>
 #include "pch.h"
 #include "main.hpp"
@@ -16,7 +17,7 @@ using namespace winrt::Windows::Graphics::DirectX::Direct3D11;
 using namespace winrt::Windows::Graphics::DirectX;
 using namespace Windows::Graphics::DirectX::Direct3D11;
 void send_100ms_keystroke_blocking(uint8_t keystroke, HWND hWnd);
-uint64_t identify_digits(D3D11_MAPPED_SUBRESOURCE &image);
+uint32_t identify_digits(D3D11_MAPPED_SUBRESOURCE &image);
 static BOOL enum_callback(HWND hWnd, LPARAM state) {
     HWND* target_window = (HWND*) state;
     char window_title[50] = {0};
@@ -123,6 +124,14 @@ int main(int argc, char* argv[]) {
     // }
     // printf("Base address: 0x%llx\n", base_address);
 
+    // connect to WSL2
+    WSLConnection conn;
+    int res = connect_to_wsl(conn);
+    if (res == -1) {
+        printf("Failed to connect to WSL\n");
+        return -1;
+    }
+
     auto factory = winrt::get_activation_factory<GraphicsCaptureItem, IGraphicsCaptureItemInterop>();
     GraphicsCaptureItem item = { nullptr };
     winrt::check_hresult(factory->CreateForWindow(target_window, winrt::guid_of<GraphicsCaptureItem>(), winrt::put_abi(item)));
@@ -197,11 +206,18 @@ int main(int argc, char* argv[]) {
     uint8_t* img_buffer = new uint8_t[240*(145)*3];
     
     std::mutex event_mutex;
+    std::mutex data_mutex;
     std::condition_variable event_cv;
     bool game_over{false};
-    int current_score{0};
+    std::atomic<uint32_t> current_score{0};
     frame_pool.FrameArrived([&](Direct3D11CaptureFramePool f, winrt::Windows::Foundation::IInspectable d) {
         Direct3D11CaptureFrame frame = f.TryGetNextFrame();
+        Direct3D11CaptureFrame frame_next = f.TryGetNextFrame();
+        while (frame_next != NULL) {
+            frame.Close();
+            frame = frame_next;
+            frame_next = f.TryGetNextFrame();
+        }
         // printf("Frame %d\n", ++i);
         // auto surface = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
         
@@ -221,7 +237,8 @@ int main(int argc, char* argv[]) {
         winrt::check_hresult(context->Map(pTexture, 0, D3D11_MAP_READ, 0, &texture_mapped));
 
         const int BYTES_PER_PIXEL = 4;
-        int score = (int) identify_digits(texture_mapped);
+        uint32_t score = (int) identify_digits(texture_mapped);
+        data_mutex.lock();
         for (int y = 0; y < 240; y++) {
             for (int x = 83; x < 83+145; x++) {
                 for (int c = 0; c < 3; c++) {
@@ -232,6 +249,11 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
+        if (score != current_score) {
+            current_score = score;
+            printf("score: %d\n", score);
+        }
+        data_mutex.unlock();
 
         context->Unmap(pTexture, 0);
    
@@ -247,19 +269,18 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
-        if (i == 3) {
-            for (int y = 0; y < 240; y++) {
-                for (int x = 0; x < 145; x++) {
-                    for (int c = 0; c < 3; c++) {
-                        printf("%d ", img_buffer[(y*145*3) + (3*x) + c]);
-                    }
-                }
-            }
-        }
-        if (score != current_score) {
-            current_score = score;
-            printf("score: %d\n", score);
-        }
+        // if (i == 3) {
+        //     for (int y = 0; y < 240; y++) {
+        //         for (int x = 0; x < 145; x++) {
+        //             for (int c = 0; c < 3; c++) {
+        //                 // printf("%d ", img_buffer[(y*145*3) + (3*x) + c]);
+        //             }
+        //         }
+        //     }
+        // }
+
+        // send the buffer
+        send_data(conn, img_buffer, 240*145*3);
 
         frame.Close();
         return;
@@ -292,8 +313,8 @@ int main(int argc, char* argv[]) {
   777
 */
 
-uint64_t identify_digits(D3D11_MAPPED_SUBRESOURCE &image) {
-    int off_x = 2;
+uint32_t identify_digits(D3D11_MAPPED_SUBRESOURCE &image) {
+    int off_x = 0;
     int off_y = 22;
 
     const int offsets[8][2] = {
@@ -310,8 +331,8 @@ uint64_t identify_digits(D3D11_MAPPED_SUBRESOURCE &image) {
     const uint8_t digits[10] = {
         0x6b, 0x85, 0xb9, 0xf9, 0x12, 0xd3, 0xf3, 0x99, 0xfb, 0xcb
     };
-    uint64_t result = 0;
-    uint64_t fac = 100000000;
+    uint32_t result = 0;
+    uint32_t fac = 100000000;
     for (int d = 0; d < 9; d++) {
         uint8_t active_segment[8] = {0};
         uint8_t digit_mask{0};

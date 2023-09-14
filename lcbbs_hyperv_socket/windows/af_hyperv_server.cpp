@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 struct __declspec(uuid("000005F0-abd9-408d-90ea-c0896d524f67")) ServiceGUID{};
-struct __declspec(uuid("3686aa24-2566-42ae-b25e-7a3fa5129b57")) VmGUID{};
+struct __declspec(uuid("0ab3e255-3fba-44fd-a825-156c062b28f6")) VmGUID{};
 
 int main(void) {
     WSADATA WsaData = { 0 };
@@ -16,6 +16,7 @@ int main(void) {
     }
 
     SOCKET sock = socket(AF_HYPERV, SOCK_STREAM, HV_PROTOCOL_RAW);
+    SOCKET client{INVALID_SOCKET};
     if (sock == INVALID_SOCKET) {
         printf("Failed to create socket: %d\n", WSAGetLastError());
     }
@@ -32,7 +33,7 @@ int main(void) {
         goto Exit;
     }
 
-    res = listen(sock, 1);
+    res = listen(sock, 0);
     if (res == SOCKET_ERROR) {
         printf("Failed to start listen: %d\n", WSAGetLastError());
         goto Exit;
@@ -40,7 +41,7 @@ int main(void) {
     printf("Listening\n");
 
     // accept a connection
-    SOCKET client = accept(sock, NULL, NULL);
+    client = accept(sock, NULL, NULL);
     if (client == INVALID_SOCKET) {
         printf("Failed to accept client: %d\n", WSAGetLastError());
         goto Exit;
