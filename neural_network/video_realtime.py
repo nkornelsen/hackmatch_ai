@@ -20,8 +20,15 @@ im_tk = None
 #     lmain.place(x=0, y=0)
 # set_image()
 
+current_score = 0
 def video_stream():
     global im_tk
+    global current_score
+    score_data = sock.recv(4, socket.MSG_WAITALL)
+    score = struct.unpack("!i", score_data)
+    if score != current_score:
+        current_score = score
+        print(f"score: {current_score}")
     # bytes_left = 240*145*3
     img_array = np.empty(240*145*3, dtype=np.uint8)
     # img_data = sock.recv(16385, socket.MSG_WAITALL)

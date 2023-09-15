@@ -280,6 +280,8 @@ int main(int argc, char* argv[]) {
         // }
 
         // send the buffer
+        uint32_t send_score = htonl(score);
+        send_data(conn, (uint8_t *) &send_score, 4);
         send_data(conn, img_buffer, 240*145*3);
 
         frame.Close();
