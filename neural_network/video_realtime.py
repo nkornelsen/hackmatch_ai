@@ -25,7 +25,10 @@ def video_stream():
     global im_tk
     global current_score
     score_data = sock.recv(4, socket.MSG_WAITALL)
-    score = struct.unpack("!i", score_data)
+    score = struct.unpack("!i", score_data)[0]
+    if score == -1:
+        score_data = sock.recv(4, socket.MSG_WAITALL)
+        score = struct.unpack("!i", score_data)[0]
     if score != current_score:
         current_score = score
         print(f"score: {current_score}")
