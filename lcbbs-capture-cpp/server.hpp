@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 struct __declspec(uuid("000005F0-abd9-408d-90ea-c0896d524f67")) ServiceGUID{};
-struct __declspec(uuid("0ab3e255-3fba-44fd-a825-156c062b28f6")) VmGUID{};
+struct __declspec(uuid("30D5218E-F3EB-47E3-8DAF-5C2764F8D6F6")) VmGUID{};
 
 typedef struct WSLConnection {
     SOCKET client;

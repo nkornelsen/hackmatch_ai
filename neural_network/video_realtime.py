@@ -24,6 +24,7 @@ current_score = 0
 def video_stream():
     global im_tk
     global current_score
+    # print("Recv...")
     score_data = sock.recv(4, socket.MSG_WAITALL)
     score = struct.unpack("!i", score_data)[0]
     if score == -1:
@@ -41,7 +42,7 @@ def video_stream():
         arr_offset = 260*145*3 - bytes_left
         sock.recv_into(img_array[arr_offset:], min(bytes_left, 16384), socket.MSG_WAITALL)
         bytes_left -= min(bytes_left, 16384)
-    
+    # print("Got frame")
     # img_array = np.frombuffer(img_data, dtype=np.uint8)
     img_array = np.reshape(img_array, (260, 145, 3))
     img_array = img_array[...,::-1]

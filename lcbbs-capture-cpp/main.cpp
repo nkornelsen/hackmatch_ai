@@ -243,8 +243,7 @@ int main(int argc, char* argv[]) {
 
         Direct3D11CaptureFrame frame = f.TryGetNextFrame();
         bool locked = framecapture_mutex.try_lock();
-        if (!locked)
-            return;
+        if (!locked) return;
         if (!current_frame_valid) {
             current_frame = frame;
             current_frame_valid = true;
