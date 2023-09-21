@@ -32,21 +32,21 @@ def video_stream():
     if score != current_score:
         current_score = score
         print(f"score: {current_score}")
-    # bytes_left = 240*145*3
-    img_array = np.empty(240*145*3, dtype=np.uint8)
+    # bytes_left = 260*145*3
+    img_array = np.empty(260*145*3, dtype=np.uint8)
     # img_data = sock.recv(16385, socket.MSG_WAITALL)
-    bytes_left = 240*145*3
+    bytes_left = 260*145*3
     # img_dst = np.ravel(img_array)
     while bytes_left > 0:
-        arr_offset = 240*145*3 - bytes_left
+        arr_offset = 260*145*3 - bytes_left
         sock.recv_into(img_array[arr_offset:], min(bytes_left, 16384), socket.MSG_WAITALL)
         bytes_left -= min(bytes_left, 16384)
     
     # img_array = np.frombuffer(img_data, dtype=np.uint8)
-    img_array = np.reshape(img_array, (240, 145, 3))
+    img_array = np.reshape(img_array, (260, 145, 3))
     img_array = img_array[...,::-1]
 
-    # for y in range(240):
+    # for y in range(260):
     #     for x in range(145):
     #         for c in range(3):
     #             print(img_array[y, x, c], end=' ')

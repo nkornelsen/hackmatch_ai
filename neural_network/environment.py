@@ -22,13 +22,13 @@ def get_next_state(sock):
     if score == -1:
         print("Game over")
         return (None, None)
-    img_array = np.empty(240*145*3, dtype=np.uint8)
-    bytes_left = 240*145*3
+    img_array = np.empty(260*145*3, dtype=np.uint8)
+    bytes_left = 260*145*3
     while bytes_left > 0:
-        arr_offset = 240*145*3 - bytes_left
+        arr_offset = 260*145*3 - bytes_left
         sock.recv_into(img_array[arr_offset:], min(bytes_left, 16384), socket.MSG_WAITALL)
         bytes_left -= min(bytes_left, 16384)
-    img_array = np.reshape(img_array, (240, 145, 3))[...,::-1]
+    img_array = np.reshape(img_array, (260, 145, 3))[...,::-1]
     frames_received += 1
     if frames_received % 300 == 0:
         print(f"Total frames: {frames_received}")
@@ -40,7 +40,7 @@ class HackMatchEnvironment(py_environment.PyEnvironment):
         # nothing, z, x, left, right, hold left, hold right
         self._action_spec = array_spec.BoundedArraySpec(shape=(), dtype=np.uint8, minimum=0, maximum=4, name="action")
         self._observation_spec = {
-            "board": array_spec.BoundedArraySpec(shape=(240, 145, 3), dtype=np.float16, minimum=0, maximum=256.0, name="observation_board"),
+            "board": array_spec.BoundedArraySpec(shape=(260, 145, 3), dtype=np.float16, minimum=0, maximum=256.0, name="observation_board"),
             "prev_action": array_spec.BoundedArraySpec(shape=(5,), dtype=np.float32, minimum=0, maximum=1.0, name="observation_prev_action")
         }
         self._current_score = 0
@@ -83,7 +83,7 @@ class HackMatchEnvironment(py_environment.PyEnvironment):
             if score is None:
                 self._episode_ended = True
                 return time_step.termination(observation={
-                    "board": np.zeros((240, 145, 3), dtype=np.float16),
+                    "board": np.zeros((260, 145, 3), dtype=np.float16),
                     "prev_action": prev_action}, 
                     reward=np.float32(0.0))
             reward = score - self._current_score

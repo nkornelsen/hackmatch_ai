@@ -172,8 +172,8 @@ int main(int argc, char* argv[]) {
     ));
 
     D3D11_TEXTURE2D_DESC desc{0};
-    desc.Width = 83+145;
-    desc.Height = 240;
+    desc.Width = 83+144;
+    desc.Height = 260;
     desc.MipLevels = desc.ArraySize = 1;
     desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     desc.SampleDesc.Count = 1;
@@ -218,7 +218,7 @@ int main(int argc, char* argv[]) {
     sourceRegion.left = 409-83;
     sourceRegion.right = sourceRegion.left + 83 + 145;
     sourceRegion.top = 184;
-    sourceRegion.bottom = sourceRegion.top + 240;
+    sourceRegion.bottom = sourceRegion.top + 260;
     sourceRegion.front = 0;
     sourceRegion.back = 1;
     int i = 0;
@@ -242,7 +242,9 @@ int main(int argc, char* argv[]) {
     frame_pool.FrameArrived([&](Direct3D11CaptureFramePool f, winrt::Windows::Foundation::IInspectable d) {
 
         Direct3D11CaptureFrame frame = f.TryGetNextFrame();
-        framecapture_mutex.lock();
+        bool locked = framecapture_mutex.try_lock();
+        if (!locked)
+            return;
         if (!current_frame_valid) {
             current_frame = frame;
             current_frame_valid = true;
@@ -353,7 +355,7 @@ int main(int argc, char* argv[]) {
     timer_cb_data.send_next_frame_cv = &send_next_frame_cv;
     timer_cb_data.send_next_frame_mutex = &send_next_frame_mutex;
 
-    uint8_t* img_buffer = new uint8_t[240*(145)*3];
+    uint8_t* img_buffer = new uint8_t[260*(145)*3];
     session.StartCapture();
     {
         std::unique_lock lk(send_next_frame_mutex);
@@ -407,7 +409,7 @@ int main(int argc, char* argv[]) {
         const int BYTES_PER_PIXEL = 4;
         uint32_t score = (int) identify_digits(texture_mapped);
         // copy into the send buffer
-        for (int y = 0; y < 240; y++) {
+        for (int y = 0; y < 260; y++) {
             for (int x = 83; x < 83+145; x++) {
                 for (int c = 0; c < 3; c++) {
                     // if (i == 3) {
@@ -437,7 +439,7 @@ int main(int argc, char* argv[]) {
             // send frame
             uint32_t send_score = htonl(score);
             send_data(conn, (uint8_t *) &send_score, 4);
-            send_data(conn, img_buffer, 240*145*3);
+            send_data(conn, img_buffer, 260*145*3);
         } else {
             // send reset signal and reset game, then pause
             lk.unlock();

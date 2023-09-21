@@ -42,7 +42,7 @@ tf_env = tf_py_environment.TFPyEnvironment(hm_environment)
 print("TimeStep Specs:", hm_environment.time_step_spec())
 print("Action Specs:", hm_environment.action_spec())
 
-input_img = tf.keras.Input(shape=(240, 145, 3), dtype=tf.dtypes.float16)
+input_img = tf.keras.Input(shape=(260, 145, 3), dtype=tf.dtypes.float16)
 input_prev_action = tf.keras.Input(shape=(5,), dtype=tf.dtypes.float32)
 
 
@@ -64,7 +64,7 @@ conv_input = tf.keras.layers.Conv2D(
     (5, 6),
     "valid",
     activation=tf.keras.activations.relu,
-    input_shape=(240, 145, 3),
+    input_shape=(260, 145, 3),
     kernel_initializer=tf.keras.initializers.VarianceScaling()
 )
 
@@ -117,12 +117,12 @@ q_network = networks.Sequential([
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005)
 train_step_counter = tf.Variable(0, dtype=tf.int64)
 
-temperature_counter = 0
+episode_counter = tf.Variable(0, dtype=tf.int64)
 
 @tf.function
 def get_epsilon():
-    global temperature_counter
-    return 0.7*np.exp(-0.15*temperature_counter)
+    global episode_counter
+    return 0.7*np.exp(-0.15*np.float64(episode_counter.value()) / np.float32(change_temperature_interval))
 
 agent = dqn_agent.DqnAgent(
     tf_env.time_step_spec(),
@@ -199,8 +199,6 @@ summary_dir = os.path.join(".", "metrics")
 summary_writer = tf.summary.create_file_writer(summary_dir, flush_millis=1000)
 summary_writer.set_as_default()
 
-episode_counter = tf.Variable(0, dtype=tf.int64)
-
 train_metrics = [
     tf_metrics.NumberOfEpisodes(),
     tf_metrics.AverageReturnMetric(),
@@ -228,7 +226,8 @@ train_checkpointer = common.Checkpointer(
     ckpt_dir=checkpoint_dir,
     agent=agent,
     policy=agent.policy,
-    global_step=train_step_counter
+    global_step=train_step_counter,
+    episode_counter=episode_counter
 )
 
 dataset = replay_buffer.as_dataset(
@@ -255,6 +254,7 @@ while True:
         if episode_counter.value() >= num_episodes:
             break
     print(f"Episode {episode_counter.value()}")
+    print(f"Epsilon: {get_epsilon()}")
     loss = []
     i = 0
     
@@ -286,10 +286,7 @@ while True:
 
     if episode_counter.value() % checkpoint_interval == 0:
         print("Saving checkpoint!")
-        train_checkpointer.save(train_step_counter)
-    
-    if episode_counter.value() % change_temperature_interval == 0:
-        temperature_counter += 1
+        train_checkpointer.save(train_step_counter)    
 
     # unpause the game
     send_action = 8
